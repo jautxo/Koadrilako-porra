@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Participantes{% endblock %}
+{% block content %}
+<h1>Participantes</h1>
+<p><a href="/admin/participantes/nuevo">+ Dar de alta un participante</a></p>
+<table class="ranking">
+  <thead><tr><th>Nombre</th><th>Equipos</th><th></th></tr></thead>
+  <tbody>
+    {% for p in participants %}
+    <tr>
+      <td>{{ p.name }}</td>
+      <td>{{ p.picks|map(attribute="team.name")|join(", ") }}</td>
+      <td><a href="/admin/participantes/{{ p.id }}/editar">Editar equipos</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

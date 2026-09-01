@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ "Editar" if editing else "Nuevo" }} participante{% endblock %}
+{% block content %}
+<h1>{{ "Editar equipos de " + name if editing else "Nuevo participante" }}</h1>
+
+{% if errors %}
+<ul class="errors">
+  {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<form method="post" class="team-picker">
+  {% if not editing %}
+  <label>Nombre
+    <input type="text" name="name" value="{{ name or '' }}" required>
+  </label>
+  {% endif %}
+
+  <p>Elige 8 equipos distintos:</p>
+  <div class="team-selects">
+    {% for i in range(8) %}
+    <select name="team_{{ i }}" class="team-select" required>
+      <option value="">-- equipo {{ i + 1 }} --</option>
+      {% for team in all_teams %}
+      <option value="{{ team }}" {% if selected and selected|length > i and selected[i] == team %}selected{% endif %}>{{ team }}</option>
+      {% endfor %}
+    </select>
+    {% endfor %}
+  </div>
+
+  <button type="submit">{{ "Guardar" if editing else "Dar de alta" }}</button>
+</form>
+
+<script>
+  const selects = document.querySelectorAll(".team-select");
+  function refreshOptions() {
+    const chosen = Array.from(selects).map(s => s.value).filter(v => v);
+    selects.forEach(select => {
+      Array.from(select.options).forEach(opt => {
+        if (!opt.value) return;
+        opt.disabled = chosen.includes(opt.value) && select.value !== opt.value;
+      });
+    });
+  }
+  selects.forEach(s => s.addEventListener("change", refreshOptions));
+  refreshOptions();
+</script>
+{% endblock %}

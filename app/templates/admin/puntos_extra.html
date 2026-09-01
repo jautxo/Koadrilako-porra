@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Puntos extra{% endblock %}
+{% block content %}
+<h1>Puntos extra</h1>
+<p>Ajuste manual, acumulativo, que se suma al total de la clasificación general de un participante.</p>
+
+{% if errors %}
+<ul class="errors">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+<table class="ranking">
+  <thead><tr><th>Participante</th><th>Jornada</th><th>Puntos</th><th>Nota</th></tr></thead>
+  <tbody>
+    {% for ep in entries %}
+    <tr>
+      <td>{{ ep.participant.name }}</td>
+      <td>{{ ep.jornada_number }}</td>
+      <td class="{{ 'pos' if ep.points >= 0 else 'neg' }}">{{ ep.points }}</td>
+      <td>{{ ep.note or "" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Añadir puntos extra</h2>
+<form method="post" action="/admin/puntos-extra/nuevo">
+  <label>Participante
+    <select name="participant_id" required>
+      {% for p in participants %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Jornada
+    <select name="jornada_number" required>
+      {% for j in jornadas %}<option value="{{ j.number }}">{{ j.number }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Puntos <input type="number" name="points" required></label>
+  <label>Nota (opcional) <input type="text" name="note"></label>
+  <button type="submit">Añadir</button>
+</form>
+{% endblock %}

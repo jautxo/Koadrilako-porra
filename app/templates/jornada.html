@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Jornada {{ jornada.number }}{% endblock %}
+{% block content %}
+<div class="jornada-nav">
+  {% if prev_number %}<a href="/jornada/{{ prev_number }}">&laquo; Jornada {{ prev_number }}</a>{% else %}<span></span>{% endif %}
+  <h1>Jornada {{ jornada.number }}{% if jornada.is_trap %} <span class="trap-badge">trampa</span>{% endif %}</h1>
+  {% if next_number %}<a href="/jornada/{{ next_number }}">Jornada {{ next_number }} &raquo;</a>{% else %}<span></span>{% endif %}
+</div>
+
+{% if jornada.is_trap %}
+<p class="notice">Jornada trampa: los puntos de esta jornada salen en negativo para todos. No afecta al total acumulado.</p>
+{% endif %}
+
+<h2>Partidos</h2>
+<table class="matches">
+  <tbody>
+    {% for m in matches %}
+    <tr>
+      <td class="team home">{{ m.home_team.name }}</td>
+      <td class="score">
+        {% if m.home_goals is not none and m.away_goals is not none %}
+          {{ m.home_goals }} - {{ m.away_goals }}
+        {% else %}
+          - vs -
+        {% endif %}
+      </td>
+      <td class="team away">{{ m.away_team.name }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Puntos de la jornada</h2>
+<table class="ranking">
+  <thead><tr><th>#</th><th>Participante</th><th>Puntos</th></tr></thead>
+  <tbody>
+    {% for participant, points in leaderboard %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td><a href="/participante/{{ participant.id }}">{{ participant.name }}</a></td>
+      <td class="{{ 'pos' if points >= 0 else 'neg' }}">{{ points }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Jornadas (admin){% endblock %}
+{% block content %}
+<h1>Jornadas</h1>
+<ul class="jornada-list">
+  {% for jornada in jornadas %}
+  <li>
+    <a href="/admin/jornadas/{{ jornada.number }}">Jornada {{ jornada.number }}</a>
+    {% if jornada.is_trap %}<span class="trap-badge">trampa</span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

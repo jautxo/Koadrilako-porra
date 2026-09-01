@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Clasificación general{% endblock %}
+{% block content %}
+<h1>Clasificación general</h1>
+<table class="ranking">
+  <thead>
+    <tr><th>#</th><th>Participante</th><th>Puntos</th></tr>
+  </thead>
+  <tbody>
+    {% for participant, total in ranking %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td><a href="/participante/{{ participant.id }}">{{ participant.name }}</a></td>
+      <td class="{{ 'pos' if total >= 0 else 'neg' }}">{{ total }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

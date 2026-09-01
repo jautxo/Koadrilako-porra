@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Jornada {{ jornada.number }} (admin){% endblock %}
+{% block content %}
+<h1>Jornada {{ jornada.number }}</h1>
+
+{% if warnings %}
+<ul class="errors">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+{% endif %}
+{% if messages %}
+<ul class="messages">{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
+{% endif %}
+
+<form method="post" action="/admin/jornadas/{{ jornada.number }}/trampa">
+  <button type="submit">{{ "Quitar de jornada trampa" if jornada.is_trap else "Marcar como jornada trampa" }}</button>
+</form>
+
+<h2>Resultados</h2>
+<form method="post" action="/admin/jornadas/{{ jornada.number }}/resultados">
+  <table class="matches editable">
+    <tbody>
+      {% for m in matches %}
+      <tr>
+        <td class="team home">{{ m.home_team.name }}</td>
+        <td><input type="number" name="home_{{ m.id }}" value="{{ m.home_goals if m.home_goals is not none else '' }}" min="0"></td>
+        <td>-</td>
+        <td><input type="number" name="away_{{ m.id }}" value="{{ m.away_goals if m.away_goals is not none else '' }}" min="0"></td>
+        <td class="team away">{{ m.away_team.name }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button type="submit">Guardar resultados</button>
+</form>
+
+<h2>Sincronizar desde football-data.org</h2>
+<form method="post" action="/admin/jornadas/{{ jornada.number }}/sync">
+  <label><input type="checkbox" name="force" value="1"> Sobrescribir resultados ya puestos a mano</label>
+  <button type="submit">Sincronizar esta jornada</button>
+</form>
+{% endblock %}

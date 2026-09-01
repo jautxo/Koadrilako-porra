@@ -20,7 +20,7 @@ Convertir la porra actual (Excel `../Liga BBVA 2026-2027 Apertura.xlsm`, gestion
 
 ## Pasos para preparar el hosting (cuando se retome)
 
-1. **Repositorio Git** — el proyecto tiene que estar en GitHub, porque Render/Railway despliegan directamente desde ahí. Esta carpeta (`webapp_porra/`) todavía no es un repo git.
+1. ✅ **Repositorio Git** — hecho. Repo en GitHub: https://github.com/jautxo/Koadrilako-porra (conectado como `origin`, rama `main`).
 2. **Estructura desplegable** — `requirements.txt`, comando de arranque (ej. `uvicorn app:app`), variables de entorno para secretos (API key de football-data.org, credenciales de la BD) — nunca hardcodeadas en el código ni subidas al repo.
 3. **Cuenta en Render o Railway**, conectada al repo de GitHub.
 4. **Configurar el servicio**: build command, start command, variables de entorno, base de datos (Postgres gratuito recomendado).

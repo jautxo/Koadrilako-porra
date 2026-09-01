@@ -1,0 +1,28 @@
+{
+  "_comment": "canonical = nombre que se guarda en la tabla teams (fuente de verdad de la webapp). aliases = variantes con las que puede venir el mismo equipo desde football-data.org (name/shortName/tla). Si la API devuelve un equipo que no coincide con ningún alias, hay que pararse y avisar en vez de adivinar.",
+  "teams": [
+    {"canonical": "R. Madrid", "aliases": ["Real Madrid CF", "Real Madrid", "RMA"]},
+    {"canonical": "Barcelona", "aliases": ["FC Barcelona", "Barcelona", "FCB"]},
+    {"canonical": "Betis", "aliases": ["Real Betis Balompié", "Real Betis", "Betis", "BET"]},
+    {"canonical": "Atlético", "aliases": ["Club Atlético de Madrid", "Atlético de Madrid", "Atletico Madrid", "Atlético Madrid", "ATM"]},
+    {"canonical": "Athletic", "aliases": ["Athletic Club", "Athletic Bilbao", "ATH"]},
+    {"canonical": "Villareal", "aliases": ["Villarreal CF", "Villarreal", "VIL"]},
+    {"canonical": "Celta", "aliases": ["RC Celta de Vigo", "Celta Vigo", "Celta", "CEL"]},
+    {"canonical": "Real Sociedad", "aliases": ["Real Sociedad de Fútbol", "Real Sociedad", "RSO"]},
+    {"canonical": "Valencia", "aliases": ["Valencia CF", "Valencia", "VAL"]},
+    {"canonical": "Mallorca", "aliases": ["RCD Mallorca", "Mallorca", "MAL"]},
+    {"canonical": "Osasuna", "aliases": ["CA Osasuna", "Osasuna", "OSA"]},
+    {"canonical": "Rayo", "aliases": ["Rayo Vallecano de Madrid", "Rayo Vallecano", "Rayo", "RAY"]},
+    {"canonical": "Getafe", "aliases": ["Getafe CF", "Getafe", "GET"]},
+    {"canonical": "Sevilla", "aliases": ["Sevilla FC", "Sevilla", "SEV"]},
+    {"canonical": "Espanyol", "aliases": ["RCD Espanyol de Barcelona", "RCD Espanyol", "Espanyol", "ESP"]},
+    {"canonical": "Alavés", "aliases": ["Deportivo Alavés", "Alavés", "Alaves", "ALA"]},
+    {"canonical": "Girona", "aliases": ["Girona FC", "Girona", "GIR"]},
+    {"canonical": "Levante", "aliases": ["Levante UD", "Levante", "LEV"]},
+    {"canonical": "Elche", "aliases": ["Elche CF", "Elche", "ELX", "ELC"]},
+    {"canonical": "Oviedo", "aliases": ["Real Oviedo", "Oviedo", "OVI"]},
+    {"canonical": "Deportivo", "aliases": ["RC Deportivo", "RC Deportivo de La Coruña", "RC Deportivo La Coruña", "Deportivo de La Coruña", "Deportivo La Coruña", "Deportivo"]},
+    {"canonical": "Racing", "aliases": ["Real Racing Club", "Real Racing Club de Santander", "Racing de Santander", "Racing Club de Santander", "Racing Santander", "Racing"]},
+    {"canonical": "Málaga", "aliases": ["Málaga CF", "Malaga CF", "Malaga", "Málaga"]}
+  ]
+}

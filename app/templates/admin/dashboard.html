@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<h1>Administración</h1>
+<ul class="admin-menu">
+  <li><a href="/admin/participantes">Participantes</a> — alta, edición de equipos elegidos</li>
+  <li><a href="/admin/equipos">Equipos</a> — lista de equipos válidos de la temporada</li>
+  <li><a href="/admin/jornadas">Jornadas</a> — resultados, sincronización y jornadas trampa</li>
+  <li><a href="/admin/puntos-extra">Puntos extra</a> — ajustes manuales acumulativos</li>
+</ul>
+{% endblock %}

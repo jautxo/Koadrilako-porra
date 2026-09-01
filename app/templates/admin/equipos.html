@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Equipos{% endblock %}
+{% block content %}
+<h1>Equipos de la temporada</h1>
+
+{% if errors %}
+<ul class="errors">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+{% if messages %}
+<ul class="messages">{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
+{% endif %}
+
+<ul class="team-list">
+  {% for team in teams %}<li>{{ team.name }}</li>{% endfor %}
+</ul>
+
+<h2>Añadir equipo manualmente</h2>
+<form method="post" action="/admin/equipos/nuevo">
+  <input type="text" name="name" placeholder="Nombre del equipo" required>
+  <button type="submit">Añadir</button>
+</form>
+
+<h2>Sincronizar con football-data.org</h2>
+<p>Añade automáticamente los equipos que la API tenga y aún no estén en la lista. No borra equipos existentes.</p>
+<form method="post" action="/admin/equipos/sync">
+  <button type="submit">Sincronizar</button>
+</form>
+{% endblock %}
