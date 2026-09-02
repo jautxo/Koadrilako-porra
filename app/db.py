@@ -7,9 +7,20 @@ from sqlalchemy.orm import sessionmaker
 from .models import Base
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = os.environ.get("DATABASE_PATH", str(PROJECT_DIR / "porra.db"))
 
-engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+# Render/Neon-en bezalako hodeietan DATABASE_URL ingurune-aldagaia dago
+# (PostgreSQL). Hori ez badago, garapenerako SQLite fitxategi lokala erabili.
+_database_url = os.environ.get("DATABASE_URL")
+if _database_url:
+    # Zenbait hornitzailek "postgres://" itzultzen dute, baina SQLAlchemy-k
+    # "postgresql://" behar du psycopg2 driver-arekin erabiltzeko.
+    if _database_url.startswith("postgres://"):
+        _database_url = _database_url.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(_database_url)
+else:
+    DB_PATH = os.environ.get("DATABASE_PATH", str(PROJECT_DIR / "porra.db"))
+    engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
@@ -20,7 +31,15 @@ def init_db() -> None:
 
 def _migrate() -> None:
     """create_all crea tablas nuevas pero no columnas nuevas en tablas ya
-    existentes: añade aquí a mano las que se han ido incorporando."""
+    existentes: añade aquí a mano las que se han ido incorporando.
+
+    Migrazio hau SQLite-rako idatzita dago (PRAGMA eta abar), datu-base
+    zaharrak eguneratzeko. PostgreSQL-en (Render/Neon) beti hasten gara base
+    hutsetik, eta create_all()-ek jada eguneratutako eskema sortzen du, beraz
+    ez dago zertan exekutatu."""
+    if engine.dialect.name != "sqlite":
+        return
+
     with engine.begin() as conn:
         cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(jornadas)")}
         if "is_published" not in cols:

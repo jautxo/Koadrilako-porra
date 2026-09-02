@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: koadrilako-porra
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: FOOTBALL_DATA_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false

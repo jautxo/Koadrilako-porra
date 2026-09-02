@@ -1,0 +1,15 @@
+{
+  "name": "Koadrilako Porra",
+  "short_name": "Porra",
+  "description": "KtK koadrilaren futbol porra",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#152016",
+  "theme_color": "#152016",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

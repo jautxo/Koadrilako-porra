@@ -18,6 +18,8 @@ from .db import get_session, init_db
 from .football_api import FootballDataClient
 from .models import DerbyPrediction, Jornada, Match, Participant, ParticipantTeam, Team
 from .queries import build_scoreboard, get_settings
+from .scheduler import start_scheduler, stop_scheduler
+from .sync import sync_jornada
 from .team_badges import team_badge
 from .validation import (
     load_team_mapping,
@@ -82,6 +84,16 @@ templates.env.filters["initials"] = _initials_filter
 templates.env.globals["team_badge"] = team_badge
 
 init_db()
+
+
+@app.on_event("startup")
+def _on_startup() -> None:
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+def _on_shutdown() -> None:
+    stop_scheduler()
 
 
 # --------------------------------------------------------------------------
@@ -671,77 +683,21 @@ async def admin_jornada_sync(
     form = await request.form()
     force = form.get("force") == "1"
 
+    result = sync_jornada(session, number, force=force)
+    messages = [
+        f"Sinkronizatuta: {result.created} partida sortuta, {result.updated} emaitza eguneratuta, "
+        f"{result.skipped} baztertuta."
+    ]
+
     jornada = session.get(Jornada, number)
-    if jornada is None:
-        jornada = Jornada(number=number)
-        session.add(jornada)
-        session.flush()
-
-    warnings: list[str] = []
-    messages: list[str] = []
-
-    try:
-        client = FootballDataClient()
-        api_matches = client.get_matches(matchday=number)
-    except Exception as exc:  # noqa: BLE001
-        warnings.append(f"Ezin izan da football-data.org kontsultatu: {exc}")
-        api_matches = []
-
-    mapping = load_team_mapping()
-    teams_by_name = {t.name: t for t in session.scalars(select(Team)).all()}
-    existing = {
-        (m.home_team_id, m.away_team_id): m
-        for m in session.scalars(select(Match).where(Match.jornada_number == number)).all()
-    }
-
-    created, updated, skipped = 0, 0, 0
-    for api_match in api_matches:
-        home_name = translate_team_name(api_match.home_team, mapping)
-        away_name = translate_team_name(api_match.away_team, mapping)
-        if home_name is None or away_name is None:
-            warnings.append(
-                f"Ez dago mapaketarik '{api_match.home_team}' edo '{api_match.away_team}' taldeentzat team_mapping.json fitxategian."
-            )
-            skipped += 1
-            continue
-        home_team = teams_by_name.get(home_name)
-        away_team = teams_by_name.get(away_name)
-        if home_team is None or away_team is None:
-            warnings.append(f"'{home_name}' edo '{away_name}' ez dago denboraldiko taldeen zerrendan.")
-            skipped += 1
-            continue
-
-        has_score = api_match.finished and api_match.home_goals is not None and api_match.away_goals is not None
-        key = (home_team.id, away_team.id)
-        match = existing.get(key)
-        if match is None:
-            match = Match(
-                jornada_number=number,
-                home_team_id=home_team.id,
-                away_team_id=away_team.id,
-                home_goals=api_match.home_goals if has_score else None,
-                away_goals=api_match.away_goals if has_score else None,
-            )
-            session.add(match)
-            existing[key] = match
-            created += 1
-        elif has_score:
-            already_has_result = match.home_goals is not None or match.away_goals is not None
-            if not already_has_result or force:
-                match.home_goals = api_match.home_goals
-                match.away_goals = api_match.away_goals
-                updated += 1
-
-    session.commit()
-    messages.append(f"Sinkronizatuta: {created} partida sortuta, {updated} emaitza eguneratuta, {skipped} baztertuta.")
-
     matches = session.scalars(select(Match).where(Match.jornada_number == number)).all()
     return templates.TemplateResponse(
         "admin/jornada_form.html",
         {
-            "request": request, "jornada": jornada, "matches": matches, "warnings": warnings, "messages": messages,
+            "request": request, "jornada": jornada, "matches": matches, "warnings": result.warnings,
+            "messages": messages,
             "derby_bonus_points": get_settings(session).derby_bonus_points,
-            "derby_rows": _admin_derby_rows(session, number),
+            "derbiak": _admin_derbiak(session, number),
             "points_breakdown": _jornada_points_breakdown(session, number),
         },
     )
