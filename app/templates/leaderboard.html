@@ -1,19 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Clasificación general{% endblock %}
+{% block title %}Sailkapena{% endblock %}
 {% block content %}
-<h1>Clasificación general</h1>
-<table class="ranking">
-  <thead>
-    <tr><th>#</th><th>Participante</th><th>Puntos</th></tr>
-  </thead>
-  <tbody>
-    {% for participant, total in ranking %}
-    <tr>
-      <td>{{ loop.index }}</td>
-      <td><a href="/participante/{{ participant.id }}">{{ participant.name }}</a></td>
-      <td class="{{ 'pos' if total >= 0 else 'neg' }}">{{ total }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="page-heading">
+  <h1 class="page-title headline">SAILKAPENA</h1>
+  <div class="page-subtitle">Kiniela</div>
+</div>
+
+<div class="row-header">
+  <div style="width:18px;">#</div>
+  <div style="flex-grow:1;">Partaidea</div>
+  <div>Pt.</div>
+</div>
+<div class="rows">
+  {% for participant, total in ranking %}
+  {% set is_top = loop.index <= top_highlight_count %}
+  {% set is_bottom = bottom_highlight_start > 0 and bottom_highlight_start <= loop.index and loop.index <= bottom_highlight_end %}
+  <a href="/participante/{{ participant.id }}" class="row {{ 'top' if is_top else ('bottom' if is_bottom else '') }}" style="text-decoration:none; color:inherit;">
+    <div class="rank">{{ loop.index }}</div>
+    <div class="badge">{{ participant.name | initials }}</div>
+    <div class="name">{{ participant.name }}</div>
+    <div class="pts headline {{ 'pos' if total >= 0 else 'neg' }}">{{ total }}</div>
+  </a>
+  {% endfor %}
+</div>
 {% endblock %}

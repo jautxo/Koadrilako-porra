@@ -33,8 +33,8 @@ class FootballDataClient:
         api_key = api_key or os.environ.get("FOOTBALL_DATA_API_KEY")
         if not api_key:
             raise ValueError(
-                "Falta la variable de entorno FOOTBALL_DATA_API_KEY "
-                "(consigue una API key gratis en https://www.football-data.org/client/register)."
+                "FOOTBALL_DATA_API_KEY ingurune-aldagaia falta da "
+                "(lortu doako API key bat hemen: https://www.football-data.org/client/register)."
             )
         self.competition_code = competition_code
         self._session = requests.Session()
@@ -50,7 +50,7 @@ class FootballDataClient:
                 continue
             resp.raise_for_status()
             return resp.json()
-        raise RuntimeError(f"No se pudo completar la petición a {url} tras varios reintentos")
+        raise RuntimeError(f"Ezin izan da {url} eskaera osatu hainbat saiakeraren ondoren")
 
     def get_teams(self) -> list[dict]:
         data = self._get(f"/competitions/{self.competition_code}/teams")

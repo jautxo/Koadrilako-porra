@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Jornada {{ jornada.number }} (admin){% endblock %}
+{% block title %}{{ jornada.number }}. jardunaldia (admin){% endblock %}
 {% block content %}
-<h1>Jornada {{ jornada.number }}</h1>
+<h1>{{ jornada.number }}. jardunaldia {% if jornada.is_published %}<span class="published-badge">argitaratuta</span>{% else %}<span class="trap-badge">zain</span>{% endif %}</h1>
 
 {% if warnings %}
 <ul class="errors">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
@@ -10,11 +10,21 @@
 <ul class="messages">{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
 {% endif %}
 
-<form method="post" action="/admin/jornadas/{{ jornada.number }}/trampa">
-  <button type="submit">{{ "Quitar de jornada trampa" if jornada.is_trap else "Marcar como jornada trampa" }}</button>
+<p class="muted">{% if jornada.is_published %}Jardunaldi hau publikoki ikusgai dago. Emaitzak edo derbia aldatzen badituzu, aldaketak berehala ikusiko dira; ez duzu berriro balidatu behar.{% else %}Jardunaldi hau ez dago oraindik ikusgai partaideentzat. Beheko emaitzak eta puntuak gainbegiratu ondoren, "Argitaratu" sakatu partaideek ikusi dezaten.{% endif %}</p>
+<form method="post" action="/admin/jornadas/{{ jornada.number }}/argitaratu">
+  <button type="submit">{{ "Ikusgaitasunetik kendu" if jornada.is_published else "Argitaratu (partaideentzat ikusgai jarri)" }}</button>
 </form>
 
-<h2>Resultados</h2>
+<form method="post" action="/admin/jornadas/{{ jornada.number }}/trampa">
+  <button type="submit">{{ "Tranpa-jardunalditik kendu" if jornada.is_trap else "Tranpa-jardunaldi gisa markatu" }}</button>
+</form>
+
+<form method="post" action="/admin/jornadas/{{ jornada.number }}/sync">
+  <label><input type="checkbox" name="force" value="1"> Eskuz jarritako emaitzak gainidatzi</label>
+  <button type="submit">Emaitzak sinkronizatu</button>
+</form>
+
+<h2>Emaitzak</h2>
 <form method="post" action="/admin/jornadas/{{ jornada.number }}/resultados">
   <table class="matches editable">
     <tbody>
@@ -29,12 +39,58 @@
       {% endfor %}
     </tbody>
   </table>
-  <button type="submit">Guardar resultados</button>
+  <button type="submit">Emaitzak gorde</button>
 </form>
 
-<h2>Sincronizar desde football-data.org</h2>
-<form method="post" action="/admin/jornadas/{{ jornada.number }}/sync">
-  <label><input type="checkbox" name="force" value="1"> Sobrescribir resultados ya puestos a mano</label>
-  <button type="submit">Sincronizar esta jornada</button>
+<h2>Derbiak</h2>
+<p class="muted">Markatu jardunaldi honetako zein partida diren derbi (bat baino gehiago izan daitezke). Partaideek emaitza zehatza asmatzen badute, {{ derby_bonus_points }} puntu gehiago lortuko dituzte derbi bakoitzeko, jardunaldi honetan eta sailkapen orokorrean.</p>
+<form method="post" action="/admin/jornadas/{{ jornada.number }}/derbi">
+  {% for m in matches %}
+  <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal;">
+    <input type="checkbox" name="derby_match_ids" value="{{ m.id }}" {{ "checked" if m.is_derby else "" }}>
+    {{ m.home_team.name }} - {{ m.away_team.name }}
+  </label>
+  {% endfor %}
+  <button type="submit">Derbiak gorde</button>
 </form>
+
+{% for derbi in derbiak %}
+<h3>{{ derbi.match.home_team.name }} - {{ derbi.match.away_team.name }} <span class="derby-badge">derbia</span></h3>
+<p><a href="/admin/jornadas/{{ jornada.number }}/derbi-iragarpenak">Partaideen iragarpenak sartu</a></p>
+{% if derbi.rows %}
+<table class="ranking">
+  <thead><tr><th>Partaidea</th><th>Iragarpena</th><th></th></tr></thead>
+  <tbody>
+    {% for row in derbi.rows %}
+    <tr>
+      <td>{{ row.participant.name }}</td>
+      <td>{{ row.home }} - {{ row.away }}</td>
+      <td>{% if row.hit %}<span class="derby-badge">asmatuta</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endfor %}
+
+<h2>Puntuak</h2>
+<p class="muted">Partaide bakoitzak jardunaldi honetan lortuko lituzkeen puntuak, nondik datozen bereizita: partiden aukeraketagatik eta derbia asmatzeagatik. Egiaztatu dena ondo dagoela argitaratu aurretik.</p>
+<table class="ranking">
+  <thead><tr><th>Partaidea</th><th>Partidak</th><th>Derbia</th><th>Guztira</th></tr></thead>
+  <tbody>
+    {% for row in points_breakdown %}
+    <tr>
+      <td>{{ row.participant.name }}</td>
+      <td class="{{ 'pos' if row.match_points >= 0 else 'neg' }}">{{ row.match_points }}</td>
+      <td class="{{ 'pos' if row.derby_points > 0 else 'muted' }}">{{ row.derby_points }}</td>
+      <td class="{{ 'pos' if row.total_points >= 0 else 'neg' }}"><strong>{{ row.total_points }}</strong></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if not jornada.is_published %}
+<form method="post" action="/admin/jornadas/{{ jornada.number }}/argitaratu">
+  <button type="submit">Ondo dago, argitaratu</button>
+</form>
+{% endif %}
 {% endblock %}

@@ -1,21 +1,32 @@
 <!doctype html>
-<html lang="es">
+<html lang="eu">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Porra{% endblock %}</title>
+  <title>{% block title %}Kiniela{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <nav class="topnav">
-    <a href="/" class="brand">La Porra</a>
-    <a href="/">Clasificación Porra</a>
-    <a href="/jornadas">Jornadas Porra</a>
-    <a href="/liga/clasificacion">Clasificación Liga</a>
-    <a href="/liga/calendario">Calendario Liga</a>
-    <a href="/liga/resultados">Resultados Liga</a>
-    <a href="/admin">Admin</a>
-  </nav>
+  {% set active_tab = active_tab|default('') %}
+  <header class="app-header">
+    <div class="topbar">
+      <a href="/" class="brand">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 3 L12 21 M3 12 L21 12" stroke="currentColor" stroke-width="1.4" opacity="0.6"/></svg>
+        <span class="headline">KOADRILAKO PORRA</span>
+      </a>
+      <a href="/admin" class="gear" aria-label="Administrazioa">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </a>
+    </div>
+    <nav class="tabs">
+      <a href="/" class="tab {{ 'active' if active_tab == 'porra' else '' }}">Sailkapena</a>
+      <a href="/jornadas" class="tab {{ 'active' if active_tab == 'jornadas' else '' }}">Jardunaldiak</a>
+      <a href="/liga/clasificacion" class="tab {{ 'active' if active_tab == 'liga_tabla' else '' }}">Ligako sailkapena</a>
+      <a href="/liga/calendario" class="tab {{ 'active' if active_tab == 'liga_calendario' else '' }}">Egutegia eta emaitzak</a>
+    </nav>
+  </header>
   <main>
     {% block content %}{% endblock %}
   </main>

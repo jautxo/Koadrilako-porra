@@ -17,7 +17,7 @@ def require_admin(credentials: HTTPBasicCredentials = Depends(security)) -> str:
     if not admin_password:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="ADMIN_PASSWORD no está configurada en el servidor.",
+            detail="ADMIN_PASSWORD ez dago konfiguratuta zerbitzarian.",
         )
 
     correct_user = secrets.compare_digest(credentials.username, admin_user)
@@ -25,7 +25,7 @@ def require_admin(credentials: HTTPBasicCredentials = Depends(security)) -> str:
     if not (correct_user and correct_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas",
+            detail="Kredentzial okerrak",
             headers={"WWW-Authenticate": "Basic"},
         )
     return credentials.username

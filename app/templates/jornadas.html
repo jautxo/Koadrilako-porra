@@ -1,12 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Jornadas{% endblock %}
+{% block title %}Jardunaldiak{% endblock %}
 {% block content %}
-<h1>Jornadas</h1>
+<div class="page-heading">
+  <h1 class="page-title headline">JARDUNALDIAK</h1>
+  <div class="page-subtitle">Kiniela</div>
+</div>
 <ul class="jornada-list">
-  {% for jornada in jornadas %}
+  {% for row in rows %}
   <li>
-    <a href="/jornada/{{ jornada.number }}">Jornada {{ jornada.number }}</a>
-    {% if jornada.is_trap %}<span class="trap-badge">trampa</span>{% endif %}
+    <a href="/jornada/{{ row.jornada.number }}">{{ row.jornada.number }}. jardunaldia</a>
+    {% if row.status == "pending" %}<span class="pending-badge">balidazioaren zain</span>
+    {% elif row.status == "not_played" %}<span class="pending-badge">jokatu gabe</span>
+    {% elif row.jornada.is_trap %}<span class="trap-badge">tranpa</span>{% endif %}
   </li>
   {% endfor %}
 </ul>

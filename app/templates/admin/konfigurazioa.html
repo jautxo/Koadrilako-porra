@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Derbiak{% endblock %}
+{% block content %}
+<h1>Derbiak</h1>
+
+{% if errors %}
+<ul class="errors">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+{% if messages %}
+<ul class="messages">{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>
+{% endif %}
+
+<h2>Derbia</h2>
+<form method="post" action="/admin/konfigurazioa">
+  <label>Derbia asmatzeagatiko puntuak
+    <input type="number" name="derby_bonus_points" value="{{ settings.derby_bonus_points }}" required>
+  </label>
+  <p class="muted">Derbi-jardunaldi batean partaide batek emaitza zehatza asmatzen badu, puntu hauek gehituko zaizkio jardunaldi horri eta sailkapen orokorrari.</p>
+  <button type="submit">Gorde</button>
+</form>
+
+<h2>Zein partida diren derbi</h2>
+<p class="muted">Jardunaldi bakoitzeko, markatu zein partida diren derbi (bat baino gehiago izan daitezke jardunaldi berean).</p>
+<table class="ranking">
+  <thead><tr><th>Jardunaldia</th><th>Derbi-partidak</th></tr></thead>
+  <tbody>
+    {% for jornada in jornadas %}
+    {% set jornada_matches = matches_by_jornada.get(jornada.number, []) %}
+    {% if jornada_matches %}
+    <tr>
+      <td>{{ jornada.number }}</td>
+      <td>
+        <form method="post" action="/admin/konfigurazioa/derbia" style="margin:0;">
+          <input type="hidden" name="jornada_number" value="{{ jornada.number }}">
+          {% for m in jornada_matches %}
+          <label style="display:flex; align-items:center; gap:0.4rem; font-weight:normal; margin-bottom:0.2rem;">
+            <input type="checkbox" name="derby_match_ids" value="{{ m.id }}" {{ "checked" if m.is_derby else "" }}>
+            {{ m.home_team.name }} - {{ m.away_team.name }}
+          </label>
+          {% endfor %}
+          <button type="submit">Gorde</button>
+        </form>
+      </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Derbi-iragarpenak</h2>
+{% if not derbi_partidak %}
+<p class="muted">Oraindik ez dago derbirik esleituta.</p>
+{% else %}
+<p class="muted">Partaide bakoitzak derbi bakoitzerako esan duen emaitza. Hutsik utzi oraindik ez badu ezer esan.</p>
+<form method="post" action="/admin/konfigurazioa/derbi-emaitzak">
+  <div style="overflow-x:auto; margin:0 1.25rem 1rem;">
+  <table class="ranking">
+    <thead>
+      <tr>
+        <th>Partaidea</th>
+        {% for m in derbi_partidak %}
+        <th>{{ m.jornada_number }}. jard.<br><span class="muted">{{ m.home_team.name }} - {{ m.away_team.name }}</span></th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in participants %}
+      <tr>
+        <td>{{ p.name }}</td>
+        {% for m in derbi_partidak %}
+        {% set pred = predictions.get((m.id, p.id)) %}
+        <td style="white-space:nowrap;">
+          <input type="number" name="home_{{ m.id }}_{{ p.id }}" value="{{ pred.predicted_home_goals if pred else '' }}" min="0" style="width:3rem;">
+          -
+          <input type="number" name="away_{{ m.id }}_{{ p.id }}" value="{{ pred.predicted_away_goals if pred else '' }}" min="0" style="width:3rem;">
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <button type="submit">Iragarpenak gorde</button>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Taulen ikuspegia{% endblock %}
+{% block content %}
+<h1>Taulen ikuspegia</h1>
+
+{% if errors %}
+<ul class="errors">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+<p class="muted">Sailkapen orokorrean (hasierako orria) postu batzuk albo-marra batekin nabarmentzeko.</p>
+<form method="post" action="/admin/taulak">
+  <label>Goitik zenbat postu nabarmendu (barra berdea)
+    <input type="number" name="top_highlight_count" value="{{ settings.top_highlight_count }}" min="0" required>
+  </label>
+  <p class="muted">Adibidez, 1 jarrita, lehen postuak bakarrik izango du barra berdea.</p>
+
+  <label>Barra gorria: zein postutik
+    <input type="number" name="bottom_highlight_start" value="{{ settings.bottom_highlight_start }}" min="0" required>
+  </label>
+  <label>Barra gorria: zein postura arte
+    <input type="number" name="bottom_highlight_end" value="{{ settings.bottom_highlight_end }}" min="0" required>
+  </label>
+  <p class="muted">Adibidez, 10etik 15era jarrita, postu horiek bakarrik izango dute barra gorria. 0 eta 0 jarrita, ez da ezer nabarmenduko.</p>
+
+  <button type="submit">Gorde</button>
+</form>
+{% endblock %}

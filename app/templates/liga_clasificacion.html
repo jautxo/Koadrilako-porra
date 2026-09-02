@@ -1,33 +1,35 @@
 {% extends "base.html" %}
-{% block title %}Clasificación Liga{% endblock %}
+{% block title %}Ligako sailkapena{% endblock %}
 {% block content %}
-<h1>Clasificación — Primera División</h1>
+<div class="page-heading">
+  <h1 class="page-title headline">SAILKAPENA</h1>
+  <div class="page-subtitle">Lehen Maila</div>
+</div>
+
 {% if error %}
-<p class="notice">No se pudo obtener la clasificación: {{ error }}</p>
+<p class="notice">Ezin izan da sailkapena eskuratu: {{ error }}</p>
 {% else %}
-<table class="ranking">
-  <thead>
-    <tr>
-      <th>#</th><th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th>
-      <th>GF</th><th>GC</th><th>DG</th><th>Pts</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in standings %}
-    <tr>
-      <td>{{ row.position }}</td>
-      <td>{{ row.team }}</td>
-      <td>{{ row.played }}</td>
-      <td>{{ row.won }}</td>
-      <td>{{ row.draw }}</td>
-      <td>{{ row.lost }}</td>
-      <td>{{ row.goals_for }}</td>
-      <td>{{ row.goals_against }}</td>
-      <td>{{ row.goal_diff }}</td>
-      <td><strong>{{ row.points }}</strong></td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="row-header">
+  <div style="width:18px;">#</div>
+  <div style="flex-grow:1;">Taldea</div>
+  <div class="stat">J</div>
+  <div class="stat">GD</div>
+  <div style="width:38px; text-align:right;">Pt.</div>
+</div>
+<div class="rows">
+  {% set total = standings|length %}
+  {% for row in standings %}
+  {% set zone = 'champions' if loop.index <= 4 else ('europa' if loop.index == 5 else ('conference' if loop.index == 6 else ('relegation' if loop.index > total - 3 else ''))) %}
+  <div class="row {{ zone }}">
+    <div class="rank">{{ row.position }}</div>
+    {% set badge = team_badge(row.team) %}
+    <div class="badge team" style="background:{{ badge.color }}; color:{{ badge.text_color }};">{{ badge.initials }}</div>
+    <div class="name">{{ row.team }}</div>
+    <div class="stat">{{ row.played }}</div>
+    <div class="stat {{ 'dg-pos' if row.goal_diff > 0 else ('dg-neg' if row.goal_diff < 0 else '') }}">{{ '+' if row.goal_diff > 0 else '' }}{{ row.goal_diff }}</div>
+    <div class="pts headline" style="width:38px; text-align:right;">{{ row.points }}</div>
+  </div>
+  {% endfor %}
+</div>
 {% endif %}
 {% endblock %}

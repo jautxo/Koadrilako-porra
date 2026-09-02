@@ -16,8 +16,9 @@ from .auth import require_admin
 from .cache import cached
 from .db import get_session, init_db
 from .football_api import FootballDataClient
-from .models import ExtraPoints, Jornada, Match, Participant, ParticipantTeam, Team
-from .queries import build_scoreboard
+from .models import DerbyPrediction, Jornada, Match, Participant, ParticipantTeam, Team
+from .queries import build_scoreboard, get_settings
+from .team_badges import team_badge
 from .validation import (
     load_team_mapping,
     translate_team_name,
@@ -53,12 +54,32 @@ def _liga_matches_por_jornada(max_matchday: int = LIGA_ULTIMA_JORNADA) -> dict[i
         )
     return dict(sorted(by_jornada.items()))
 
+
+def _liga_default_jornada(by_jornada: dict[int, list[dict]]) -> int:
+    numbers = sorted(by_jornada.keys())
+    if not numbers:
+        return 1
+    for n in numbers:
+        if any(not m["finished"] for m in by_jornada[n]):
+            return n
+    return numbers[-1]
+
+
+def _initials_filter(name: str) -> str:
+    words = name.split()
+    if len(words) >= 2:
+        return (words[0][0] + words[1][0]).upper()
+    return name[:2].upper()
+
+
 APP_DIR = Path(__file__).resolve().parent
 load_dotenv(APP_DIR.parent / ".env")
 
-app = FastAPI(title="La Porra")
+app = FastAPI(title="Kiniela")
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=APP_DIR / "templates")
+templates.env.filters["initials"] = _initials_filter
+templates.env.globals["team_badge"] = team_badge
 
 init_db()
 
@@ -70,40 +91,92 @@ init_db()
 @app.get("/")
 def leaderboard(request: Request, session: Session = Depends(get_session)):
     board = build_scoreboard(session)
+    settings = get_settings(session)
     return templates.TemplateResponse(
-        "leaderboard.html", {"request": request, "ranking": board.season_leaderboard()}
+        "leaderboard.html",
+        {
+            "request": request, "active_tab": "porra", "ranking": board.season_leaderboard(),
+            "top_highlight_count": settings.top_highlight_count,
+            "bottom_highlight_start": settings.bottom_highlight_start,
+            "bottom_highlight_end": settings.bottom_highlight_end,
+        },
     )
+
+
+def _jornada_status(jornada: Jornada, matches: list[Match]) -> str:
+    """'published' (balidatuta), 'pending' (jokatuta baina balidatzeke) edo
+    'not_played' (oraindik jokatu gabe), emaitzen presentzian oinarrituta."""
+    if jornada.is_published:
+        return "published"
+    if matches and all(m.home_goals is not None and m.away_goals is not None for m in matches):
+        return "pending"
+    return "not_played"
 
 
 @app.get("/jornadas")
 def jornadas_list(request: Request, session: Session = Depends(get_session)):
     jornadas = session.scalars(select(Jornada).order_by(Jornada.number)).all()
-    return templates.TemplateResponse("jornadas.html", {"request": request, "jornadas": jornadas})
+    matches = session.scalars(select(Match)).all()
+    matches_by_jornada: dict[int, list[Match]] = {}
+    for m in matches:
+        matches_by_jornada.setdefault(m.jornada_number, []).append(m)
+
+    rows = [
+        {"jornada": j, "status": _jornada_status(j, matches_by_jornada.get(j.number, []))}
+        for j in jornadas
+    ]
+    return templates.TemplateResponse(
+        "jornadas.html", {"request": request, "active_tab": "jornadas", "rows": rows}
+    )
 
 
 @app.get("/jornada/{number}")
 def jornada_detail(number: int, request: Request, session: Session = Depends(get_session)):
     jornada = session.get(Jornada, number)
     if jornada is None:
-        raise HTTPException(status_code=404, detail="Jornada no encontrada")
+        raise HTTPException(status_code=404, detail="Ez da jardunaldia aurkitu")
 
     matches = session.scalars(
         select(Match).where(Match.jornada_number == number)
     ).all()
+    status = _jornada_status(jornada, matches)
 
-    board = build_scoreboard(session)
-    all_numbers = sorted(j.number for j in board.jornadas)
+    all_numbers = [n for n in session.scalars(select(Jornada.number).order_by(Jornada.number)).all()]
     idx = all_numbers.index(number)
 
+    points_breakdown: list[dict] = []
+    derbiak: list[dict] = []
+    if jornada.is_published:
+        board = build_scoreboard(session)
+        points_breakdown = _points_breakdown_from_board(board, number)
+        for derby_match in board.derby_matches_by_jornada.get(number, []):
+            hits = board.derby_hits_by_match.get(derby_match.id, set())
+            derbiak.append({
+                "match": derby_match,
+                "rows": [
+                    {"participant": dp.participant, "home": dp.predicted_home_goals,
+                     "away": dp.predicted_away_goals, "hit": dp.participant_id in hits}
+                    for dp in board.derby_predictions_by_match.get(derby_match.id, [])
+                ],
+            })
+
+    settings = get_settings(session)
     return templates.TemplateResponse(
         "jornada.html",
         {
             "request": request,
+            "active_tab": "jornadas",
             "jornada": jornada,
+            "status": status,
             "matches": matches,
-            "leaderboard": board.jornada_leaderboard(number),
+            "points_breakdown": points_breakdown,
             "prev_number": all_numbers[idx - 1] if idx > 0 else None,
             "next_number": all_numbers[idx + 1] if idx < len(all_numbers) - 1 else None,
+            "derbiak": derbiak,
+            "derby_bonus_points": settings.derby_bonus_points,
+            "top_highlight_count": settings.top_highlight_count,
+            "bottom_highlight_start": settings.bottom_highlight_start,
+            "bottom_highlight_end": settings.bottom_highlight_end,
         },
     )
 
@@ -118,33 +191,32 @@ def liga_clasificacion(request: Request):
     except Exception as exc:  # noqa: BLE001 - se muestra al usuario tal cual
         error = str(exc)
     return templates.TemplateResponse(
-        "liga_clasificacion.html", {"request": request, "standings": standings, "error": error}
+        "liga_clasificacion.html",
+        {"request": request, "active_tab": "liga_tabla", "standings": standings, "error": error},
     )
 
 
 @app.get("/liga/calendario")
-def liga_calendario(request: Request):
+def liga_calendario(request: Request, jornada: int | None = None):
     by_jornada: dict[int, list[dict]] = {}
     error = None
     try:
         by_jornada = _liga_matches_por_jornada()
     except Exception as exc:  # noqa: BLE001
         error = str(exc)
+    number = jornada if jornada is not None else (_liga_default_jornada(by_jornada) if by_jornada else 1)
+    number = max(1, min(number, LIGA_ULTIMA_JORNADA))
     return templates.TemplateResponse(
-        "liga_calendario.html", {"request": request, "by_jornada": by_jornada, "error": error}
-    )
-
-
-@app.get("/liga/resultados")
-def liga_resultados(request: Request):
-    by_jornada: dict[int, list[dict]] = {}
-    error = None
-    try:
-        by_jornada = _liga_matches_por_jornada()
-    except Exception as exc:  # noqa: BLE001
-        error = str(exc)
-    return templates.TemplateResponse(
-        "liga_resultados.html", {"request": request, "by_jornada": by_jornada, "error": error}
+        "liga_calendario.html",
+        {
+            "request": request,
+            "active_tab": "liga_calendario",
+            "number": number,
+            "matches": by_jornada.get(number, []),
+            "prev_number": number - 1 if number > 1 else None,
+            "next_number": number + 1 if number < LIGA_ULTIMA_JORNADA else None,
+            "error": error,
+        },
     )
 
 
@@ -152,28 +224,31 @@ def liga_resultados(request: Request):
 def participante_detail(participant_id: int, request: Request, session: Session = Depends(get_session)):
     participant = session.get(Participant, participant_id)
     if participant is None:
-        raise HTTPException(status_code=404, detail="Participante no encontrado")
+        raise HTTPException(status_code=404, detail="Ez da partaidea aurkitu")
 
     board = build_scoreboard(session)
     cumulative = 0
     rows = []
     for jornada in board.jornadas:
-        points = board.per_jornada.get(jornada.number, {}).get(participant.id, 0)
+        derby_bonus = board.derby_bonus_by_jornada.get(jornada.number, {}).get(participant.id, 0)
+        sign = -1 if jornada.is_trap else 1
+        points = sign * board.per_jornada.get(jornada.number, {}).get(participant.id, 0) + derby_bonus
         cumulative += points
         rows.append({
             "number": jornada.number,
             "is_trap": jornada.is_trap,
             "points": points,
             "cumulative": cumulative,
+            "derby_hit": derby_bonus > 0,
         })
 
     return templates.TemplateResponse(
         "participante.html",
         {
             "request": request,
+            "active_tab": "porra",
             "participant": participant,
             "jornada_rows": rows,
-            "extra_points": board.extra_by_participant.get(participant.id, []),
             "season_total": board.season_total.get(participant.id, 0),
         },
     )
@@ -253,7 +328,7 @@ def admin_participante_editar_form(
 ):
     participant = session.get(Participant, participant_id)
     if participant is None:
-        raise HTTPException(status_code=404, detail="Participante no encontrado")
+        raise HTTPException(status_code=404, detail="Ez da partaidea aurkitu")
     all_teams = [t.name for t in session.scalars(select(Team).order_by(Team.name)).all()]
     selected = [pick.team.name for pick in participant.picks]
     return templates.TemplateResponse(
@@ -275,7 +350,7 @@ async def admin_participante_editar_submit(
 ):
     participant = session.get(Participant, participant_id)
     if participant is None:
-        raise HTTPException(status_code=404, detail="Participante no encontrado")
+        raise HTTPException(status_code=404, detail="Ez da partaidea aurkitu")
 
     form = await request.form()
     team_names = [(form.get(f"team_{i}") or "").strip() for i in range(8)]
@@ -322,9 +397,9 @@ async def admin_equipo_nuevo(
     teams = session.scalars(select(Team).order_by(Team.name)).all()
     errors = []
     if not name:
-        errors.append("Falta el nombre del equipo.")
+        errors.append("Taldearen izena falta da.")
     elif name in {t.name for t in teams}:
-        errors.append(f"'{name}' ya está en la lista.")
+        errors.append(f"'{name}' dagoeneko zerrendan dago.")
     else:
         session.add(Team(name=name))
         session.commit()
@@ -345,7 +420,7 @@ def admin_equipos_sync(request: Request, session: Session = Depends(get_session)
         client = FootballDataClient()
         api_teams = client.get_teams()
     except Exception as exc:  # noqa: BLE001 - se muestra al admin tal cual
-        errors.append(f"No se pudo consultar football-data.org: {exc}")
+        errors.append(f"Ezin izan da football-data.org kontsultatu: {exc}")
         return templates.TemplateResponse(
             "admin/equipos.html", {"request": request, "teams": teams, "errors": errors, "messages": messages}
         )
@@ -358,7 +433,7 @@ def admin_equipos_sync(request: Request, session: Session = Depends(get_session)
         if canonical is None:
             errors.append(
                 f"'{api_team['name']}' (shortName={api_team['shortName']!r}, tla={api_team['tla']!r}) "
-                "no tiene mapeo en team_mapping.json — añádelo a mano antes de sincronizar."
+                "ez du mapaketarik team_mapping.json fitxategian — gehitu eskuz sinkronizatu aurretik."
             )
             continue
         if canonical not in current_names:
@@ -368,9 +443,9 @@ def admin_equipos_sync(request: Request, session: Session = Depends(get_session)
 
     session.commit()
     if added:
-        messages.append("Equipos añadidos: " + ", ".join(sorted(added)))
+        messages.append("Taldeak gehituta: " + ", ".join(sorted(added)))
     else:
-        messages.append("No hay equipos nuevos que añadir.")
+        messages.append("Ez dago talde berririk gehitzeko.")
 
     teams = session.scalars(select(Team).order_by(Team.name)).all()
     return templates.TemplateResponse(
@@ -386,17 +461,68 @@ def admin_jornadas(request: Request, session: Session = Depends(get_session), _:
     return templates.TemplateResponse("admin/jornadas.html", {"request": request, "jornadas": jornadas})
 
 
+def _admin_derbiak(session: Session, number: int) -> list[dict]:
+    """Jardunaldi honetako derbi bakoitza (bat baino gehiago egon daitezke),
+    bere iragarpen-taularekin, argitaratu gabe egon arren."""
+    board = build_scoreboard(session, include_unpublished=True)
+    derbiak = []
+    for derby_match in board.derby_matches_by_jornada.get(number, []):
+        hits = board.derby_hits_by_match.get(derby_match.id, set())
+        derbiak.append({
+            "match": derby_match,
+            "rows": [
+                {"participant": dp.participant, "home": dp.predicted_home_goals,
+                 "away": dp.predicted_away_goals, "hit": dp.participant_id in hits}
+                for dp in board.derby_predictions_by_match.get(derby_match.id, [])
+            ],
+        })
+    return derbiak
+
+
+def _points_breakdown_from_board(board, number: int) -> list[dict]:
+    """Partaide bakoitzak jardunaldi honetan lortuko lituzkeen puntuak,
+    partidengatik eta derbiagatik bereizita (tranpa barne)."""
+    jornada = next((j for j in board.jornadas if j.number == number), None)
+    sign = -1 if (jornada and jornada.is_trap) else 1
+    raw_scores = board.per_jornada.get(number, {})
+    derby_bonus = board.derby_bonus_by_jornada.get(number, {})
+
+    rows = []
+    for p in board.participants:
+        match_points = sign * raw_scores.get(p.id, 0)
+        derby_points = derby_bonus.get(p.id, 0)
+        rows.append({
+            "participant": p,
+            "match_points": match_points,
+            "derby_points": derby_points,
+            "total_points": match_points + derby_points,
+        })
+    return sorted(rows, key=lambda r: r["total_points"], reverse=True)
+
+
+def _jornada_points_breakdown(session: Session, number: int) -> list[dict]:
+    """Argitaratu aurretik administratzaileak ikusi ahal izateko bertsioa:
+    argitaratu gabeko jardunaldiak ere kontuan hartzen ditu."""
+    board = build_scoreboard(session, include_unpublished=True)
+    return _points_breakdown_from_board(board, number)
+
+
 @app.get("/admin/jornadas/{number}")
 def admin_jornada_form(
     number: int, request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)
 ):
     jornada = session.get(Jornada, number)
     if jornada is None:
-        raise HTTPException(status_code=404, detail="Jornada no encontrada")
+        raise HTTPException(status_code=404, detail="Ez da jardunaldia aurkitu")
     matches = session.scalars(select(Match).where(Match.jornada_number == number)).all()
     return templates.TemplateResponse(
         "admin/jornada_form.html",
-        {"request": request, "jornada": jornada, "matches": matches, "warnings": [], "messages": []},
+        {
+            "request": request, "jornada": jornada, "matches": matches, "warnings": [], "messages": [],
+            "derby_bonus_points": get_settings(session).derby_bonus_points,
+            "derbiak": _admin_derbiak(session, number),
+            "points_breakdown": _jornada_points_breakdown(session, number),
+        },
     )
 
 
@@ -406,7 +532,7 @@ async def admin_jornada_resultados(
 ):
     jornada = session.get(Jornada, number)
     if jornada is None:
-        raise HTTPException(status_code=404, detail="Jornada no encontrada")
+        raise HTTPException(status_code=404, detail="Ez da jardunaldia aurkitu")
 
     form = await request.form()
     matches = session.scalars(select(Match).where(Match.jornada_number == number)).all()
@@ -425,10 +551,117 @@ def admin_jornada_trampa(
 ):
     jornada = session.get(Jornada, number)
     if jornada is None:
-        raise HTTPException(status_code=404, detail="Jornada no encontrada")
+        raise HTTPException(status_code=404, detail="Ez da jardunaldia aurkitu")
     jornada.is_trap = not jornada.is_trap
     session.commit()
     return RedirectResponse(f"/admin/jornadas/{number}", status_code=303)
+
+
+@app.post("/admin/jornadas/{number}/argitaratu")
+def admin_jornada_argitaratu(
+    number: int, session: Session = Depends(get_session), _: str = Depends(require_admin)
+):
+    jornada = session.get(Jornada, number)
+    if jornada is None:
+        raise HTTPException(status_code=404, detail="Ez da jardunaldia aurkitu")
+    jornada.is_published = not jornada.is_published
+    session.commit()
+    return RedirectResponse(f"/admin/jornadas/{number}", status_code=303)
+
+
+@app.post("/admin/jornadas/{number}/derbi")
+async def admin_jornada_derbi(
+    number: int, request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)
+):
+    jornada = session.get(Jornada, number)
+    if jornada is None:
+        raise HTTPException(status_code=404, detail="Ez da jardunaldia aurkitu")
+
+    form = await request.form()
+    selected_ids = {int(v) for v in form.getlist("derby_match_ids")}
+    matches = session.scalars(select(Match).where(Match.jornada_number == number)).all()
+    for m in matches:
+        m.is_derby = m.id in selected_ids
+    session.commit()
+    return RedirectResponse(f"/admin/jornadas/{number}", status_code=303)
+
+
+@app.get("/admin/jornadas/{number}/derbi-iragarpenak")
+def admin_derbi_iragarpenak_form(
+    number: int, request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)
+):
+    jornada = session.get(Jornada, number)
+    if jornada is None:
+        raise HTTPException(status_code=404, detail="Ez da jardunaldia aurkitu")
+    derby_matches = session.scalars(
+        select(Match).where(Match.jornada_number == number, Match.is_derby.is_(True))
+    ).all()
+    if not derby_matches:
+        raise HTTPException(status_code=400, detail="Jardunaldi honek ez du derbirik esleituta")
+
+    participants = session.scalars(select(Participant).order_by(Participant.name)).all()
+    predictions = {
+        (dp.match_id, dp.participant_id): dp
+        for dp in session.scalars(
+            select(DerbyPrediction).where(DerbyPrediction.jornada_number == number)
+        ).all()
+    }
+    return templates.TemplateResponse(
+        "admin/derbi_iragarpenak.html",
+        {
+            "request": request,
+            "jornada": jornada,
+            "derby_matches": derby_matches,
+            "participants": participants,
+            "predictions": predictions,
+            "errors": [],
+        },
+    )
+
+
+@app.post("/admin/jornadas/{number}/derbi-iragarpenak")
+async def admin_derbi_iragarpenak_submit(
+    number: int, request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)
+):
+    jornada = session.get(Jornada, number)
+    if jornada is None:
+        raise HTTPException(status_code=404, detail="Ez da jardunaldia aurkitu")
+    derby_matches = session.scalars(
+        select(Match).where(Match.jornada_number == number, Match.is_derby.is_(True))
+    ).all()
+    if not derby_matches:
+        raise HTTPException(status_code=400, detail="Jardunaldi honek ez du derbirik esleituta")
+
+    form = await request.form()
+    participants = session.scalars(select(Participant).order_by(Participant.name)).all()
+    existing = {
+        (dp.match_id, dp.participant_id): dp
+        for dp in session.scalars(
+            select(DerbyPrediction).where(DerbyPrediction.jornada_number == number)
+        ).all()
+    }
+
+    for match in derby_matches:
+        for p in participants:
+            home_raw = (form.get(f"home_{match.id}_{p.id}") or "").strip()
+            away_raw = (form.get(f"away_{match.id}_{p.id}") or "").strip()
+            prediction = existing.get((match.id, p.id))
+            if not home_raw or not away_raw:
+                if prediction is not None:
+                    session.delete(prediction)
+                continue
+            home_goals, away_goals = int(home_raw), int(away_raw)
+            if prediction is None:
+                session.add(DerbyPrediction(
+                    participant_id=p.id, jornada_number=number, match_id=match.id,
+                    predicted_home_goals=home_goals, predicted_away_goals=away_goals,
+                ))
+            else:
+                prediction.predicted_home_goals = home_goals
+                prediction.predicted_away_goals = away_goals
+
+    session.commit()
+    return RedirectResponse(f"/admin/jornadas/{number}/derbi-iragarpenak", status_code=303)
 
 
 @app.post("/admin/jornadas/{number}/sync")
@@ -451,7 +684,7 @@ async def admin_jornada_sync(
         client = FootballDataClient()
         api_matches = client.get_matches(matchday=number)
     except Exception as exc:  # noqa: BLE001
-        warnings.append(f"No se pudo consultar football-data.org: {exc}")
+        warnings.append(f"Ezin izan da football-data.org kontsultatu: {exc}")
         api_matches = []
 
     mapping = load_team_mapping()
@@ -467,14 +700,14 @@ async def admin_jornada_sync(
         away_name = translate_team_name(api_match.away_team, mapping)
         if home_name is None or away_name is None:
             warnings.append(
-                f"No hay mapeo para '{api_match.home_team}' o '{api_match.away_team}' en team_mapping.json."
+                f"Ez dago mapaketarik '{api_match.home_team}' edo '{api_match.away_team}' taldeentzat team_mapping.json fitxategian."
             )
             skipped += 1
             continue
         home_team = teams_by_name.get(home_name)
         away_team = teams_by_name.get(away_name)
         if home_team is None or away_team is None:
-            warnings.append(f"'{home_name}' o '{away_name}' no está en la lista de equipos de la temporada.")
+            warnings.append(f"'{home_name}' edo '{away_name}' ez dago denboraldiko taldeen zerrendan.")
             skipped += 1
             continue
 
@@ -500,60 +733,157 @@ async def admin_jornada_sync(
                 updated += 1
 
     session.commit()
-    messages.append(f"Sincronizado: {created} partidos creados, {updated} resultados actualizados, {skipped} omitidos.")
+    messages.append(f"Sinkronizatuta: {created} partida sortuta, {updated} emaitza eguneratuta, {skipped} baztertuta.")
 
     matches = session.scalars(select(Match).where(Match.jornada_number == number)).all()
     return templates.TemplateResponse(
         "admin/jornada_form.html",
-        {"request": request, "jornada": jornada, "matches": matches, "warnings": warnings, "messages": messages},
+        {
+            "request": request, "jornada": jornada, "matches": matches, "warnings": warnings, "messages": messages,
+            "derby_bonus_points": get_settings(session).derby_bonus_points,
+            "derby_rows": _admin_derby_rows(session, number),
+            "points_breakdown": _jornada_points_breakdown(session, number),
+        },
     )
 
 
-# --- Puntos extra ---------------------------------------------------------
+# --- Konfigurazioa ---------------------------------------------------------
 
-@app.get("/admin/puntos-extra")
-def admin_puntos_extra(request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)):
-    entries = session.scalars(select(ExtraPoints)).all()
-    participants = session.scalars(select(Participant).order_by(Participant.name)).all()
+def _derbi_konfigurazioa_context(session: Session) -> dict:
     jornadas = session.scalars(select(Jornada).order_by(Jornada.number)).all()
+    matches = session.scalars(select(Match).order_by(Match.jornada_number, Match.id)).all()
+    matches_by_jornada: dict[int, list[Match]] = {}
+    for m in matches:
+        matches_by_jornada.setdefault(m.jornada_number, []).append(m)
+
+    derbi_partidak = [m for m in matches if m.is_derby]
+    participants = session.scalars(select(Participant).order_by(Participant.name)).all()
+    predictions = {
+        (dp.match_id, dp.participant_id): dp
+        for dp in session.scalars(select(DerbyPrediction)).all()
+    }
+    return {
+        "jornadas": jornadas,
+        "matches_by_jornada": matches_by_jornada,
+        "derbi_partidak": derbi_partidak,
+        "participants": participants,
+        "predictions": predictions,
+    }
+
+
+@app.get("/admin/konfigurazioa")
+def admin_konfigurazioa(request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)):
+    settings = get_settings(session)
     return templates.TemplateResponse(
-        "admin/puntos_extra.html",
-        {"request": request, "entries": entries, "participants": participants, "jornadas": jornadas, "errors": []},
+        "admin/konfigurazioa.html",
+        {"request": request, "settings": settings, "errors": [], "messages": [], **_derbi_konfigurazioa_context(session)},
     )
 
 
-@app.post("/admin/puntos-extra/nuevo")
-async def admin_puntos_extra_nuevo(
+@app.post("/admin/konfigurazioa")
+async def admin_konfigurazioa_gorde(
+    request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)
+):
+    settings = get_settings(session)
+    form = await request.form()
+    errors = []
+    try:
+        settings.derby_bonus_points = int((form.get("derby_bonus_points") or "").strip())
+    except ValueError:
+        errors.append("Derbiaren puntuek zenbaki oso bat izan behar dute.")
+
+    if not errors:
+        session.commit()
+        return RedirectResponse("/admin/konfigurazioa", status_code=303)
+
+    session.rollback()
+    return templates.TemplateResponse(
+        "admin/konfigurazioa.html",
+        {"request": request, "settings": settings, "errors": errors, "messages": [], **_derbi_konfigurazioa_context(session)},
+    )
+
+
+@app.get("/admin/taulak")
+def admin_taulak(request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)):
+    settings = get_settings(session)
+    return templates.TemplateResponse(
+        "admin/taulak.html", {"request": request, "settings": settings, "errors": []}
+    )
+
+
+@app.post("/admin/taulak")
+async def admin_taulak_gorde(
+    request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)
+):
+    settings = get_settings(session)
+    form = await request.form()
+    errors = []
+    try:
+        settings.top_highlight_count = int((form.get("top_highlight_count") or "0").strip() or "0")
+        settings.bottom_highlight_start = int((form.get("bottom_highlight_start") or "0").strip() or "0")
+        settings.bottom_highlight_end = int((form.get("bottom_highlight_end") or "0").strip() or "0")
+    except ValueError:
+        errors.append("Postu-kopuruek zenbaki osoak izan behar dituzte.")
+
+    if not errors:
+        session.commit()
+        return RedirectResponse("/admin/taulak", status_code=303)
+
+    session.rollback()
+    return templates.TemplateResponse(
+        "admin/taulak.html", {"request": request, "settings": settings, "errors": errors}
+    )
+
+
+@app.post("/admin/konfigurazioa/derbia")
+async def admin_konfigurazioa_derbia(
     request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)
 ):
     form = await request.form()
-    errors = []
-    participant_id = form.get("participant_id")
-    jornada_number = form.get("jornada_number")
-    points_raw = (form.get("points") or "").strip()
-    note = (form.get("note") or "").strip() or None
-
-    participant = session.get(Participant, int(participant_id)) if participant_id else None
-    jornada = session.get(Jornada, int(jornada_number)) if jornada_number else None
-    if participant is None:
-        errors.append("Participante no válido.")
+    number = int(form.get("jornada_number", "0"))
+    jornada = session.get(Jornada, number)
     if jornada is None:
-        errors.append("Jornada no válida.")
-    try:
-        points = int(points_raw)
-    except ValueError:
-        errors.append("Los puntos deben ser un número entero.")
-        points = None
+        raise HTTPException(status_code=404, detail="Ez da jardunaldia aurkitu")
 
-    if not errors:
-        session.add(ExtraPoints(participant_id=participant.id, jornada_number=jornada.number, points=points, note=note))
-        session.commit()
-        return RedirectResponse("/admin/puntos-extra", status_code=303)
+    selected_ids = {int(v) for v in form.getlist("derby_match_ids")}
+    matches = session.scalars(select(Match).where(Match.jornada_number == number)).all()
+    for m in matches:
+        m.is_derby = m.id in selected_ids
+    session.commit()
+    return RedirectResponse("/admin/konfigurazioa", status_code=303)
 
-    entries = session.scalars(select(ExtraPoints)).all()
-    participants = session.scalars(select(Participant).order_by(Participant.name)).all()
-    jornadas = session.scalars(select(Jornada).order_by(Jornada.number)).all()
-    return templates.TemplateResponse(
-        "admin/puntos_extra.html",
-        {"request": request, "entries": entries, "participants": participants, "jornadas": jornadas, "errors": errors},
-    )
+
+@app.post("/admin/konfigurazioa/derbi-emaitzak")
+async def admin_konfigurazioa_derbi_emaitzak(
+    request: Request, session: Session = Depends(get_session), _: str = Depends(require_admin)
+):
+    form = await request.form()
+    derby_matches = session.scalars(select(Match).where(Match.is_derby.is_(True))).all()
+    participants = session.scalars(select(Participant)).all()
+    existing = {
+        (dp.match_id, dp.participant_id): dp
+        for dp in session.scalars(select(DerbyPrediction)).all()
+    }
+
+    for match in derby_matches:
+        for p in participants:
+            key = (match.id, p.id)
+            home_raw = (form.get(f"home_{match.id}_{p.id}") or "").strip()
+            away_raw = (form.get(f"away_{match.id}_{p.id}") or "").strip()
+            prediction = existing.get(key)
+            if not home_raw or not away_raw:
+                if prediction is not None:
+                    session.delete(prediction)
+                continue
+            home_goals, away_goals = int(home_raw), int(away_raw)
+            if prediction is None:
+                session.add(DerbyPrediction(
+                    participant_id=p.id, jornada_number=match.jornada_number, match_id=match.id,
+                    predicted_home_goals=home_goals, predicted_away_goals=away_goals,
+                ))
+            else:
+                prediction.predicted_home_goals = home_goals
+                prediction.predicted_away_goals = away_goals
+
+    session.commit()
+    return RedirectResponse("/admin/konfigurazioa", status_code=303)

@@ -39,16 +39,16 @@ def validate_participant_teams(team_names: list[str], canonical_teams: set[str])
     cleaned = [t.strip() for t in team_names if t and t.strip()]
 
     if len(cleaned) != 8:
-        errors.append(f"Se han recibido {len(cleaned)} equipos, se necesitan exactamente 8.")
+        errors.append(f"{len(cleaned)} talde jaso dira, 8 behar dira zehazki.")
         return errors
 
     if len(set(cleaned)) != 8:
-        errors.append("Hay equipos repetidos entre los 8 elegidos.")
+        errors.append("Aukeratutako 8 taldeen artean errepikatutakoak daude.")
 
     unknown = [t for t in cleaned if t not in canonical_teams]
     if unknown:
         errors.append(
-            "Estos equipos no son válidos esta temporada: " + ", ".join(sorted(set(unknown)))
+            "Talde hauek ez dira baliozkoak denboraldi honetan: " + ", ".join(sorted(set(unknown)))
         )
 
     return errors
@@ -58,7 +58,7 @@ def validate_new_participant_name(name: str, existing_names_lower: set[str]) -> 
     errors: list[str] = []
     name = (name or "").strip()
     if not name:
-        errors.append("Falta el nombre.")
+        errors.append("Izena falta da.")
     elif name.lower() in existing_names_lower:
-        errors.append(f"'{name}' ya está dado de alta.")
+        errors.append(f"'{name}' dagoeneko izena emanda dago.")
     return errors

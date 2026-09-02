@@ -1,46 +1,85 @@
 {% extends "base.html" %}
-{% block title %}Jornada {{ jornada.number }}{% endblock %}
+{% block title %}{{ jornada.number }}. jardunaldia{% endblock %}
 {% block content %}
 <div class="jornada-nav">
-  {% if prev_number %}<a href="/jornada/{{ prev_number }}">&laquo; Jornada {{ prev_number }}</a>{% else %}<span></span>{% endif %}
-  <h1>Jornada {{ jornada.number }}{% if jornada.is_trap %} <span class="trap-badge">trampa</span>{% endif %}</h1>
-  {% if next_number %}<a href="/jornada/{{ next_number }}">Jornada {{ next_number }} &raquo;</a>{% else %}<span></span>{% endif %}
+  {% if prev_number %}<a href="/jornada/{{ prev_number }}" aria-label="Aurreko jardunaldia"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></a>{% else %}<span class="placeholder"></span>{% endif %}
+  <span class="headline">{{ jornada.number }}. JARDUNALDIA{% if status == "published" and jornada.is_trap %} <span class="trap-badge">tranpa</span>{% endif %}</span>
+  {% if next_number %}<a href="/jornada/{{ next_number }}" aria-label="Hurrengo jardunaldia"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>{% else %}<span class="placeholder"></span>{% endif %}
 </div>
 
-{% if jornada.is_trap %}
-<p class="notice">Jornada trampa: los puntos de esta jornada salen en negativo para todos. No afecta al total acumulado.</p>
+{% if status == "pending" %}
+<p class="trap-note" style="color:var(--pending);">Jardunaldi hau jokatu da, baina administratzaileak oraindik ez ditu emaitzak balidatu. Laster argitaratuko dira.</p>
+{% elif status == "not_played" %}
+<p class="trap-note" style="color:var(--pending);">Jardunaldi hau oraindik ez da jokatu.</p>
+{% elif jornada.is_trap %}
+<p class="trap-note">Jardunaldi honetako puntuak denontzat negatibo joango dira, eta horrek metatutako guztirakoari ere eragingo dio.</p>
 {% endif %}
 
-<h2>Partidos</h2>
-<table class="matches">
-  <tbody>
-    {% for m in matches %}
-    <tr>
-      <td class="team home">{{ m.home_team.name }}</td>
-      <td class="score">
-        {% if m.home_goals is not none and m.away_goals is not none %}
-          {{ m.home_goals }} - {{ m.away_goals }}
-        {% else %}
-          - vs -
-        {% endif %}
-      </td>
-      <td class="team away">{{ m.away_team.name }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% if status == "published" %}
+<div class="section-label">Jardunaldiko puntuak</div>
+<div class="row-header">
+  <div style="width:22px;"></div>
+  <div style="flex-grow:1;">Partaidea</div>
+  <div style="width:40px; text-align:center;">Part.</div>
+  <div style="width:40px; text-align:center;">Derbi</div>
+  <div style="width:40px; text-align:right;">Guzt.</div>
+</div>
+<div class="rows">
+  {% for row in points_breakdown %}
+  {% set is_top = loop.index <= top_highlight_count %}
+  {% set is_bottom = bottom_highlight_start > 0 and bottom_highlight_start <= loop.index and loop.index <= bottom_highlight_end %}
+  <a href="/participante/{{ row.participant.id }}" class="row {{ 'top' if is_top else ('bottom' if is_bottom else '') }}" style="text-decoration:none; color:inherit;">
+    <div class="badge">{{ row.participant.name | initials }}</div>
+    <div class="name">{{ row.participant.name }}</div>
+    <div style="width:40px; text-align:center; font-size:0.78rem; color:var(--muted);">{{ row.match_points }}</div>
+    <div style="width:40px; text-align:center; font-size:0.78rem; color:{{ 'var(--derby)' if row.derby_points > 0 else 'var(--muted)' }};">{{ row.derby_points if row.derby_points else '–' }}</div>
+    <div class="pts headline {{ 'pos' if row.total_points >= 0 else 'neg' }}" style="width:40px; text-align:right;">{{ row.total_points }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
 
-<h2>Puntos de la jornada</h2>
+<div class="section-label">Partidak</div>
+<div class="matches">
+  {% for m in matches %}
+  <div class="match-row">
+    <div class="team home">{{ m.home_team.name }}</div>
+    {% if status == "published" and m.home_goals is not none and m.away_goals is not none %}
+    <div class="score headline"><span class="score-pair"><span class="g">{{ m.home_goals }}</span><span class="sep">-</span><span class="g">{{ m.away_goals }}</span></span></div>
+    {% else %}
+    <div class="vs">vs</div>
+    {% endif %}
+    <div class="team away">{{ m.away_team.name }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if status == "published" and derbiak %}
+{% for derbi in derbiak %}
+<div class="section-label">Derbia <span class="derby-badge">derbia</span></div>
+<div class="match-row">
+  <div class="team home">{{ derbi.match.home_team.name }}</div>
+  {% if derbi.match.home_goals is not none and derbi.match.away_goals is not none %}
+  <div class="score headline"><span class="score-pair"><span class="g">{{ derbi.match.home_goals }}</span><span class="sep">-</span><span class="g">{{ derbi.match.away_goals }}</span></span></div>
+  {% else %}
+  <div class="vs">vs</div>
+  {% endif %}
+  <div class="team away">{{ derbi.match.away_team.name }}</div>
+</div>
+{% if derbi.rows %}
 <table class="ranking">
-  <thead><tr><th>#</th><th>Participante</th><th>Puntos</th></tr></thead>
+  <thead><tr><th>Partaidea</th><th>Iragarpena</th><th></th></tr></thead>
   <tbody>
-    {% for participant, points in leaderboard %}
+    {% for row in derbi.rows %}
     <tr>
-      <td>{{ loop.index }}</td>
-      <td><a href="/participante/{{ participant.id }}">{{ participant.name }}</a></td>
-      <td class="{{ 'pos' if points >= 0 else 'neg' }}">{{ points }}</td>
+      <td>{{ row.participant.name }}</td>
+      <td>{{ row.home }} - {{ row.away }}</td>
+      <td>{% if row.hit %}<span class="derby-badge">+{{ derby_bonus_points }}</span>{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+{% endif %}
+{% endfor %}
+{% endif %}
 {% endblock %}

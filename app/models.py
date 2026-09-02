@@ -27,9 +27,6 @@ class Participant(Base):
     picks: Mapped[list["ParticipantTeam"]] = relationship(
         back_populates="participant", cascade="all, delete-orphan", order_by="ParticipantTeam.id"
     )
-    extra_points: Mapped[list["ExtraPoints"]] = relationship(
-        back_populates="participant", cascade="all, delete-orphan"
-    )
 
 
 class ParticipantTeam(Base):
@@ -49,6 +46,7 @@ class Jornada(Base):
 
     number: Mapped[int] = mapped_column(primary_key=True)
     is_trap: Mapped[bool] = mapped_column(default=False)
+    is_published: Mapped[bool] = mapped_column(default=False)
 
 
 class Match(Base):
@@ -61,20 +59,42 @@ class Match(Base):
     away_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
     home_goals: Mapped[int | None] = mapped_column(default=None)
     away_goals: Mapped[int | None] = mapped_column(default=None)
+    is_derby: Mapped[bool] = mapped_column(default=False)
 
-    jornada: Mapped["Jornada"] = relationship()
+    jornada: Mapped["Jornada"] = relationship(foreign_keys=[jornada_number])
     home_team: Mapped["Team"] = relationship(foreign_keys=[home_team_id])
     away_team: Mapped["Team"] = relationship(foreign_keys=[away_team_id])
 
 
-class ExtraPoints(Base):
-    __tablename__ = "extra_points"
+class DerbyPrediction(Base):
+    """Marcador que el administrazioak eskuz anotatu du partaide bakoitzeko,
+    derbi gisa markatutako partida (`Match.is_derby`) bakoitzarentzat. Jardunaldi
+    batek derbi bat baino gehiago izan ditzake."""
+
+    __tablename__ = "derby_predictions"
+    __table_args__ = (UniqueConstraint("participant_id", "match_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     participant_id: Mapped[int] = mapped_column(ForeignKey("participants.id"))
     jornada_number: Mapped[int] = mapped_column(ForeignKey("jornadas.number"))
-    points: Mapped[int]
-    note: Mapped[str | None] = mapped_column(default=None)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"))
+    predicted_home_goals: Mapped[int]
+    predicted_away_goals: Mapped[int]
 
-    participant: Mapped["Participant"] = relationship(back_populates="extra_points")
+    participant: Mapped["Participant"] = relationship()
     jornada: Mapped["Jornada"] = relationship()
+    match: Mapped["Match"] = relationship()
+
+
+class AppSettings(Base):
+    """Fila única (id=1) con ajustes globales editables desde el admin."""
+
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True, default=1)
+    derby_bonus_points: Mapped[int] = mapped_column(default=5)
+    top_highlight_count: Mapped[int] = mapped_column(default=3)
+    # Sailkapenean gorriz nabarmentzeko posizio-tartea (1etik hasita, biak
+    # barne). 0 bada hasieran, ez da ezer nabarmenduko.
+    bottom_highlight_start: Mapped[int] = mapped_column(default=0)
+    bottom_highlight_end: Mapped[int] = mapped_column(default=0)

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ jornada.number }}. jardunaldiko derbi-iragarpenak{% endblock %}
+{% block content %}
+<h1>{{ jornada.number }}. jardunaldiko derbi-iragarpenak</h1>
+<p>Partaide bakoitzak esan duen emaitza sartu eskuz, derbi bakoitzeko. Hutsik utzi oraindik ez badu ezer esan.</p>
+
+{% if errors %}
+<ul class="errors">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+<form method="post" action="/admin/jornadas/{{ jornada.number }}/derbi-iragarpenak">
+  {% for match in derby_matches %}
+  <h3>{{ match.home_team.name }} - {{ match.away_team.name }}</h3>
+  <table class="matches editable">
+    <tbody>
+      {% for p in participants %}
+      {% set pred = predictions.get((match.id, p.id)) %}
+      <tr>
+        <td>{{ p.name }}</td>
+        <td><input type="number" name="home_{{ match.id }}_{{ p.id }}" value="{{ pred.predicted_home_goals if pred else '' }}" min="0"></td>
+        <td>-</td>
+        <td><input type="number" name="away_{{ match.id }}_{{ p.id }}" value="{{ pred.predicted_away_goals if pred else '' }}" min="0"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+  <button type="submit">Iragarpenak gorde</button>
+</form>
+{% endblock %}

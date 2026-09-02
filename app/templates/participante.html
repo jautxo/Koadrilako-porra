@@ -1,44 +1,30 @@
 {% extends "base.html" %}
 {% block title %}{{ participant.name }}{% endblock %}
 {% block content %}
-<h1>{{ participant.name }}</h1>
+<div class="page-heading">
+  <div style="display:flex; align-items:center; gap:0.7rem;">
+    <div class="badge" style="width:44px; height:44px; font-size:0.95rem;">{{ participant.name | initials }}</div>
+    <h1 class="page-title headline" style="font-size:1.6rem;">{{ participant.name | upper }}</h1>
+  </div>
+  <div class="page-subtitle">Denboraldiko guztira: <strong style="color:#fff;">{{ season_total }}</strong></div>
+</div>
 
-<h2>Equipos elegidos</h2>
+<div class="section-label">Aukeratutako taldeak</div>
 <ul class="team-list">
   {% for pick in participant.picks %}
   <li>{{ pick.team.name }}</li>
   {% endfor %}
 </ul>
 
-<h2>Puntos por jornada</h2>
-<table class="ranking">
-  <thead><tr><th>Jornada</th><th>Puntos</th><th>Acumulado</th></tr></thead>
-  <tbody>
-    {% for row in jornada_rows %}
-    <tr>
-      <td><a href="/jornada/{{ row.number }}">{{ row.number }}{% if row.is_trap %} <span class="trap-badge">trampa</span>{% endif %}</a></td>
-      <td class="{{ 'pos' if row.points >= 0 else 'neg' }}">{{ row.points }}</td>
-      <td>{{ row.cumulative }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="section-label">Jardunaldika puntuak</div>
+<div class="rows">
+  {% for row in jornada_rows %}
+  <a href="/jornada/{{ row.number }}" class="row" style="text-decoration:none; color:inherit;">
+    <div class="rank">{{ row.number }}</div>
+    <div class="name">{{ row.number }}. jardunaldia{% if row.is_trap %} <span class="trap-badge">tranpa</span>{% endif %}{% if row.derby_hit %} <span class="derby-badge">derbia</span>{% endif %}</div>
+    <div class="pts headline {{ 'pos' if row.points >= 0 else 'neg' }}" style="font-size:1rem;">{{ row.points }}</div>
+  </a>
+  {% endfor %}
+</div>
 
-{% if extra_points %}
-<h2>Puntos extra</h2>
-<table class="ranking">
-  <thead><tr><th>Jornada</th><th>Puntos</th><th>Nota</th></tr></thead>
-  <tbody>
-    {% for ep in extra_points %}
-    <tr>
-      <td>{{ ep.jornada_number }}</td>
-      <td class="{{ 'pos' if ep.points >= 0 else 'neg' }}">{{ ep.points }}</td>
-      <td>{{ ep.note or "" }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endif %}
-
-<p><strong>Total temporada: {{ season_total }}</strong></p>
 {% endblock %}

@@ -1,26 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Calendario Liga{% endblock %}
+{% block title %}Ligako egutegia eta emaitzak{% endblock %}
 {% block content %}
-<h1>Calendario — Primera División (jornadas 1-19)</h1>
+<div class="jornada-nav">
+  {% if prev_number %}<a href="/liga/calendario?jornada={{ prev_number }}" aria-label="Aurreko jardunaldia"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></a>{% else %}<span class="placeholder"></span>{% endif %}
+  <span class="headline">{{ number }}. JARDUNALDIA</span>
+  {% if next_number %}<a href="/liga/calendario?jornada={{ next_number }}" aria-label="Hurrengo jardunaldia"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>{% else %}<span class="placeholder"></span>{% endif %}
+</div>
+<div class="jornada-sub">Egutegia eta emaitzak · Lehen Maila</div>
+
 {% if error %}
-<p class="notice">No se pudo obtener el calendario: {{ error }}</p>
+<p class="notice">Ezin izan da egutegia eskuratu: {{ error }}</p>
+{% elif not matches %}
+<p class="jornada-sub">Jardunaldi honetan ez dago partidarik.</p>
 {% else %}
-  {% for number, matches in by_jornada.items() %}
-  <h2>Jornada {{ number }}</h2>
-  <table class="matches">
-    <tbody>
-      {% for m in matches %}
-      <tr>
-        <td class="team home">{{ m.home }}</td>
-        <td class="score">
-          {% if m.finished %}{{ m.home_goals }} - {{ m.away_goals }}{% else %}vs{% endif %}
-        </td>
-        <td class="team away">{{ m.away }}</td>
-        <td class="muted">{{ m.kickoff }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="matches">
+  {% for m in matches %}
+  <div class="match-row">
+    <div class="team home">{{ m.home }}</div>
+    {% if m.finished %}
+    <div class="score headline"><span class="score-pair"><span class="g">{{ m.home_goals }}</span><span class="sep">-</span><span class="g">{{ m.away_goals }}</span></span></div>
+    {% else %}
+    <div class="vs">vs</div>
+    {% endif %}
+    <div class="team away">{{ m.away }}</div>
+  </div>
+  {% if not m.finished %}<div class="kickoff">{{ m.kickoff }}</div>{% endif %}
   {% endfor %}
+</div>
 {% endif %}
 {% endblock %}

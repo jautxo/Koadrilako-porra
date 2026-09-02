@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Admin{% endblock %}
+{% block title %}Administrazioa{% endblock %}
 {% block content %}
-<h1>Administración</h1>
+<h1>Administrazioa</h1>
 <ul class="admin-menu">
-  <li><a href="/admin/participantes">Participantes</a> — alta, edición de equipos elegidos</li>
-  <li><a href="/admin/equipos">Equipos</a> — lista de equipos válidos de la temporada</li>
-  <li><a href="/admin/jornadas">Jornadas</a> — resultados, sincronización y jornadas trampa</li>
-  <li><a href="/admin/puntos-extra">Puntos extra</a> — ajustes manuales acumulativos</li>
+  <li><a href="/admin/participantes">Partaideak</a> — izena eman, aukeratutako taldeak editatu</li>
+  <li><a href="/admin/equipos">Taldeak</a> — denboraldiko talde baliagarrien zerrenda</li>
+  <li><a href="/admin/jornadas">Jardunaldiak</a> — emaitzak, sinkronizazioa eta tranpa-jardunaldiak</li>
+  <li><a href="/admin/konfigurazioa">Derbiak</a> — derbi-jardunaldiak, iragarpenak eta puntuak</li>
+  <li><a href="/admin/taulak">Taulen ikuspegia</a> — sailkapenean nabarmentzeko postuak</li>
 </ul>
 {% endblock %}

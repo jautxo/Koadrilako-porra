@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ "Editar" if editing else "Nuevo" }} participante{% endblock %}
+{% block title %}Partaidea {{ "editatu" if editing else "berria" }}{% endblock %}
 {% block content %}
-<h1>{{ "Editar equipos de " + name if editing else "Nuevo participante" }}</h1>
+<h1>{{ "Taldeak editatu: " + name if editing else "Partaide berria" }}</h1>
 
 {% if errors %}
 <ul class="errors">
@@ -11,16 +11,16 @@
 
 <form method="post" class="team-picker">
   {% if not editing %}
-  <label>Nombre
+  <label>Izena
     <input type="text" name="name" value="{{ name or '' }}" required>
   </label>
   {% endif %}
 
-  <p>Elige 8 equipos distintos:</p>
+  <p>Aukeratu 8 talde ezberdin:</p>
   <div class="team-selects">
     {% for i in range(8) %}
     <select name="team_{{ i }}" class="team-select" required>
-      <option value="">-- equipo {{ i + 1 }} --</option>
+      <option value="">-- {{ i + 1 }}. taldea --</option>
       {% for team in all_teams %}
       <option value="{{ team }}" {% if selected and selected|length > i and selected[i] == team %}selected{% endif %}>{{ team }}</option>
       {% endfor %}
@@ -28,7 +28,7 @@
     {% endfor %}
   </div>
 
-  <button type="submit">{{ "Guardar" if editing else "Dar de alta" }}</button>
+  <button type="submit">{{ "Gorde" if editing else "Eman izena" }}</button>
 </form>
 
 <script>
