@@ -20,7 +20,10 @@ class SyncResult:
     warnings: list[str] = field(default_factory=list)
 
 
-def sync_jornada(session: Session, number: int, force: bool = False) -> SyncResult:
+def sync_jornada(session: Session, number: int, force: bool = False, api_matches=None) -> SyncResult:
+    """`api_matches` aurrez eskuratuta badago (adib. scheduler-ak jardunaldi
+    guztientzat eskaera bakarrean lortuta), hori erabiltzen da eta ez da
+    football-data.org berriro kontsultatzen jardunaldi honentzat bakarrik."""
     jornada = session.get(Jornada, number)
     if jornada is None:
         jornada = Jornada(number=number)
@@ -29,12 +32,13 @@ def sync_jornada(session: Session, number: int, force: bool = False) -> SyncResu
 
     result = SyncResult()
 
-    try:
-        client = FootballDataClient()
-        api_matches = client.get_matches(matchday=number)
-    except Exception as exc:  # noqa: BLE001
-        result.warnings.append(f"Ezin izan da football-data.org kontsultatu: {exc}")
-        api_matches = []
+    if api_matches is None:
+        try:
+            client = FootballDataClient()
+            api_matches = client.get_matches(matchday=number)
+        except Exception as exc:  # noqa: BLE001
+            result.warnings.append(f"Ezin izan da football-data.org kontsultatu: {exc}")
+            api_matches = []
 
     mapping = load_team_mapping()
     teams_by_name = {t.name: t for t in session.scalars(select(Team)).all()}

@@ -16,7 +16,11 @@ if _database_url:
     # "postgresql://" behar du psycopg2 driver-arekin erabiltzeko.
     if _database_url.startswith("postgres://"):
         _database_url = _database_url.replace("postgres://", "postgresql://", 1)
-    engine = create_engine(_database_url)
+    # Render (15 min inaktibitatearen ondoren lo egiten du) eta Neon bezalako
+    # zerbitzari gabeko Postgres-ek konexio inaktiboak isilean ixten dituzte;
+    # pool_pre_ping-ek konexio zahar bat berrerabili aurretik egiaztatzen du,
+    # bestela hurrengo eskaerak "server closed the connection" errorea emango luke.
+    engine = create_engine(_database_url, pool_pre_ping=True, pool_recycle=300)
 else:
     DB_PATH = os.environ.get("DATABASE_PATH", str(PROJECT_DIR / "porra.db"))
     engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})

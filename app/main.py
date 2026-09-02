@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -94,6 +94,15 @@ def _on_startup() -> None:
 @app.on_event("shutdown")
 def _on_shutdown() -> None:
     stop_scheduler()
+
+
+@app.get("/sw.js")
+def service_worker():
+    # Erroan zerbitzatu behar da (ez /static/ azpian), zerbitzari-langileak
+    # bere script-aren bidetik gorako esparrua kontrolatu ezin duelako
+    # bestela: /static/sw.js izanik, "/" barne hartuko lukeen instalazioa
+    # (manifest.json-ek eskatzen duena) isilean hutsalduko litzateke.
+    return FileResponse(APP_DIR / "static" / "sw.js", media_type="application/javascript")
 
 
 # --------------------------------------------------------------------------

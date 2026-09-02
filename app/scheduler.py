@@ -11,6 +11,7 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select
 
 from .db import SessionLocal
+from .football_api import FootballDataClient
 from .models import Match
 from .sync import sync_jornada
 
@@ -32,9 +33,27 @@ def _pending_jornada_numbers(session) -> list[int]:
 def sync_pending_results() -> None:
     session = SessionLocal()
     try:
-        for number in _pending_jornada_numbers(session):
+        pending_numbers = _pending_jornada_numbers(session)
+        if not pending_numbers:
+            return
+
+        # football-data.org-en doako maila 10 eskaera/minutura mugatuta dago:
+        # jardunaldi pendiente bakoitzeko eskaera bat egin beharrean (10-20
+        # eskaera exekuzio bakoitzeko izan litezke), behin bakarrik eskatu
+        # partida guztiak eta gero banatu jardunaldika.
+        try:
+            all_api_matches = FootballDataClient().get_matches()
+        except Exception:
+            logger.exception("Auto-sync: ezin izan da football-data.org kontsultatu")
+            return
+
+        matches_by_jornada: dict[int, list] = {}
+        for m in all_api_matches:
+            matches_by_jornada.setdefault(m.matchday, []).append(m)
+
+        for number in pending_numbers:
             try:
-                result = sync_jornada(session, number)
+                result = sync_jornada(session, number, api_matches=matches_by_jornada.get(number, []))
                 logger.info(
                     "Auto-sync jornada %s: %d sortuta, %d eguneratuta, %d baztertuta",
                     number, result.created, result.updated, result.skipped,
