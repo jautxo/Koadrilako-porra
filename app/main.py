@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -11,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .auth import require_admin
+from .cache import cached
 from .db import get_session, init_db
 from .football_api import FootballDataClient
 from .models import ExtraPoints, Jornada, Match, Participant, ParticipantTeam, Team
@@ -21,6 +24,34 @@ from .validation import (
     validate_new_participant_name,
     validate_participant_teams,
 )
+
+MADRID_TZ = ZoneInfo("Europe/Madrid")
+LIGA_ULTIMA_JORNADA = 19
+
+
+def _format_kickoff(utc_date: str) -> str:
+    dt = datetime.fromisoformat(utc_date.replace("Z", "+00:00")).astimezone(MADRID_TZ)
+    return dt.strftime("%d/%m/%Y %H:%M")
+
+
+def _liga_matches_por_jornada(max_matchday: int = LIGA_ULTIMA_JORNADA) -> dict[int, list[dict]]:
+    client = FootballDataClient()
+    matches = cached("liga_matches_all", 300, client.get_matches)
+    by_jornada: dict[int, list[dict]] = {}
+    for m in matches:
+        if m.matchday > max_matchday:
+            continue
+        by_jornada.setdefault(m.matchday, []).append(
+            {
+                "home": m.home_team,
+                "away": m.away_team,
+                "home_goals": m.home_goals,
+                "away_goals": m.away_goals,
+                "finished": m.finished,
+                "kickoff": _format_kickoff(m.utc_date),
+            }
+        )
+    return dict(sorted(by_jornada.items()))
 
 APP_DIR = Path(__file__).resolve().parent
 load_dotenv(APP_DIR.parent / ".env")
@@ -74,6 +105,46 @@ def jornada_detail(number: int, request: Request, session: Session = Depends(get
             "prev_number": all_numbers[idx - 1] if idx > 0 else None,
             "next_number": all_numbers[idx + 1] if idx < len(all_numbers) - 1 else None,
         },
+    )
+
+
+@app.get("/liga/clasificacion")
+def liga_clasificacion(request: Request):
+    standings: list[dict] = []
+    error = None
+    try:
+        client = FootballDataClient()
+        standings = cached("liga_standings", 600, client.get_standings)
+    except Exception as exc:  # noqa: BLE001 - se muestra al usuario tal cual
+        error = str(exc)
+    return templates.TemplateResponse(
+        "liga_clasificacion.html", {"request": request, "standings": standings, "error": error}
+    )
+
+
+@app.get("/liga/calendario")
+def liga_calendario(request: Request):
+    by_jornada: dict[int, list[dict]] = {}
+    error = None
+    try:
+        by_jornada = _liga_matches_por_jornada()
+    except Exception as exc:  # noqa: BLE001
+        error = str(exc)
+    return templates.TemplateResponse(
+        "liga_calendario.html", {"request": request, "by_jornada": by_jornada, "error": error}
+    )
+
+
+@app.get("/liga/resultados")
+def liga_resultados(request: Request):
+    by_jornada: dict[int, list[dict]] = {}
+    error = None
+    try:
+        by_jornada = _liga_matches_por_jornada()
+    except Exception as exc:  # noqa: BLE001
+        error = str(exc)
+    return templates.TemplateResponse(
+        "liga_resultados.html", {"request": request, "by_jornada": by_jornada, "error": error}
     )
 
 

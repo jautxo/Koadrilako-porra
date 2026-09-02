@@ -63,6 +63,7 @@ table.matches.editable input[type="number"] { width: 3.5rem; }
 
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
+.muted { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
 
 .trap-badge {
   background: var(--trap);

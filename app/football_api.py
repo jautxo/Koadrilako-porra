@@ -59,6 +59,28 @@ class FootballDataClient:
             for t in data.get("teams", [])
         ]
 
+    def get_standings(self) -> list[dict]:
+        data = self._get(f"/competitions/{self.competition_code}/standings")
+        tables = data.get("standings", [])
+        total_table = next((t for t in tables if t.get("type") == "TOTAL"), tables[0] if tables else {})
+        rows = []
+        for row in total_table.get("table", []):
+            rows.append(
+                {
+                    "position": row["position"],
+                    "team": row["team"]["name"],
+                    "played": row["playedGames"],
+                    "won": row["won"],
+                    "draw": row["draw"],
+                    "lost": row["lost"],
+                    "goals_for": row["goalsFor"],
+                    "goals_against": row["goalsAgainst"],
+                    "goal_diff": row["goalDifference"],
+                    "points": row["points"],
+                }
+            )
+        return rows
+
     def get_matches(self, matchday: int | None = None) -> list[ApiMatch]:
         params = {}
         if matchday is not None:
