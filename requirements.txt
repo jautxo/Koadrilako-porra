@@ -5,7 +5,6 @@ jinja2==3.1.4
 python-multipart==0.0.19
 python-dotenv==1.0.1
 requests==2.32.3
-openpyxl==3.1.5
 tzdata==2024.2
 apscheduler==3.10.4
 psycopg2-binary==2.9.10

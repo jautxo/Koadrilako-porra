@@ -1,0 +1,4 @@
+# Ez da webapp-ak berak behar (Render-en ez da instalatzen). migrate_from_excel.py
+# script-a (behin bakarrik erabiltzekoa, lokalean) exekutatzeko bakarrik behar da:
+#   pip install -r requirements-dev.txt
+openpyxl==3.1.5
