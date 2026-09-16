@@ -10,4 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Render service
-        run: curl -sf https://TUAPP.onrender.com || echo "Ping falló, pero seguimos"
+        run: curl -sf https://koadrilako-porra.onrender.com || echo "Ping falló, pero seguimos"
